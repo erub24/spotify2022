@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style> /* set the CSS */
+    .dropdown{
+        margin-left: 0px;
+        font-family: "avenir", sans-serif;
+        font-size: 15px;
+
+    }
+    .grid line {
+      stroke: #666666;
+      stroke-opacity: 1;
+      shape-rendering: crispEdges;
+    }
+    
+    .grid path {
+      stroke-opacity: 0;
+    }
+
+    .tooltip{
+        position: absolute;
+        font-family:"avenir", sans-serif;
+        stroke-width:0px;
+    }
+
+    .axisClear line{
+      stroke-width: 0;
+    }
+
+    .axisClear path{
+      stroke-width: 0;
+
+    }
+    .title{
+        margin-left: 0px;
+        font-family: "avenir", sans-serif;
+        font-style: "bold";
+        font-size:30px;
+    }
+    .subtitle{
+        margin-left: 0px;
+        font-family: "avenir", sans-serif;
+        font-size:15px;
+
+    }
+    .axisGrey line{
+      stroke: #666666;
+    }
+
+    .axisGrey path{
+        stroke: #666666;
+
+    }
+    .attribution{
+        margin-left: 0px;
+        font-family: "avenir", sans-serif;
+        font-size:15px;
+        color:grey;
+    }
+    a:link, a:visited {
+        color: #666666;
+    }
+
+
+    </style>
+<!-- Load d3.js -->
+<div id="fullTitle"></div> 
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://cdn.rawgit.com/eligrey/canvas-toBlob.js/f1a01896135ab378aa5c0118eadd81da55e698d8/canvas-toBlob.js"></script>
+<script src="https://cdn.rawgit.com/eligrey/FileSaver.js/e9d941381475b5df8b7d7691013401e171014e89/FileSaver.min.js"></script>
+<!-- Initialize a select button -->
+<select id="selectButton"></select>
+<!-- Initialize a title -->
+<div id="title"></div> 
+<div id="subTitle"></div>
+<!-- Create a div where the graph will take place -->
+<div id="my_dataviz"></div>
+<!-- Color Scale -->
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+<!--fonts-->
+<link href='https://fonts.google.com/specimen/Roboto' rel='stylesheet' type='text/css'>
+
+<script>
+
+// set the dimensions and margins of the graph
+    var margin = {top: 15, right: 0, bottom: 25, left: 50},
+        width = 700 - margin.left - margin.right,
+        height = 550 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#my_dataviz")
+      .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+        .attr("transform",
+              "translate(" + margin.left + "," + margin.top + ")");
+
+    //var parseTime = d3.timeParse("%Y-%m-%d");
+    var parseTime = d3.timeParse("%m/%d/%Y");
+    var formatDate =d3.timeFormat("%b %-d")
+    var decimalFormat =d3.format(".1f");
+    
+    //Read the data
+    d3.csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQO2cn4tbzMR-csZhfAcuz1CXkTsh2o21NIcSl6KbEJN0jt5j_jzPZhktZ4TVLDjBIeJIjqK2biiV8-/pub?gid=569502743&single=true&output=csv", function(dataFull) {
+        // append the svg object to the body of the page
+        var allGroup = d3.map(dataFull, function(d){return(d.artist)}).keys()
+        //make sure values are being read as float
+        dataFull.forEach(function(d) {
+            d['minutesPlayed']=parseFloat(d['minutesPlayed'])
+        })
+        // add the options to the button
+        d3.select("#selectButton")
+            .attr("class","dropdown")
+            .selectAll('myOptions')
+                .data(allGroup)
+            .enter()
+                .append('option')
+            .text(function (d) { return d; }) // text showed in the menu
+            .attr("value", function (d) {
+                return d; }) // corresponding value returned by the button
+
+        function createChart(artist){
+            svg. selectAll("*"). remove()
+            d3.select("#title")
+                .text("My 2022 "+artist+" streaming history")
+                .attr("class","title") 
+
+            d3.select("#attribution")
+                .attr("class","attribution")
+        
+
+            data =dataFull.filter(function(d){
+                return d.artist===artist
+            })
+
+            data.forEach(function(d) {
+                d.date = d.date;
+                d.minutes = +d['minutesPlayed'];
+            });
+
+            yMax=d3.max(data, function(d) { return +d.minutes+.5})
+            yMin=0
+            y1=yMin+(yMax/5)
+            y2=yMin+(yMax/5)*2
+            y3=yMin+(yMax/5)*3
+            y4=yMin+(yMax/5)*4
+            xMax=d3.max(data, function(d) { return +parseTime(d.date)})
+            xMin=d3.min(data, function(d) { return +parseTime(d.date)})
+
+            x1=xMin+((xMax-xMin)/5)
+            x2=x1+((xMax-xMin)/5)
+            x3=x2+((xMax-xMin)/5)
+            x4=x3+((xMax-xMin)/5)
+            var tickValuesY =[decimalFormat(y1),decimalFormat(y2),decimalFormat(y3),decimalFormat(y4),decimalFormat(yMax)]
+            //var domainX = d3.extent(data, function(d) { return d.date; });
+            var domainX=([xMin,xMax])
+            var domainY = ([yMin,yMax])
+
+            // Add X axis --> it is a date format
+            var x = d3.scaleTime()
+                .domain(domainX)
+                .range([ 0, width-150 ]);
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")");        
+            // Add Y axis
+            var y = d3.scaleLinear()
+                .domain(domainY)
+                .range([ height, 0 ]);
+
+            data.sort(function(a, b) { return parseTime(a.date) - parseTime(b.date); });
+            console.log(data)
+
+            // gridlines in y axis function
+            function make_y_gridlines() {		
+                return d3.axisLeft(y)
+                    .tickValues(tickValuesY)}
+
+            // add the Y gridlines
+            svg.append("g")			
+            .attr("class", "grid")
+            .call(make_y_gridlines() //adjust style to be our grey
+                .tickSize(-(width-150))
+                .tickFormat("")
+            )
+
+             //format y axis  
+            svg.append("g")
+                .attr("class", "axisClear")
+                .attr("transform", "translate(-40,0)")
+                .call(d3.axisLeft(y)
+                    .tickValues(tickValuesY)
+                    .ticks(5)
+                    .tickFormat(function(d, i){
+                        if (i===4){ // only format top tick (5th tick) with M cases
+                            if (d>1000){
+                                return d/1000 + "K minutes streamed"}
+                            else{
+                                return d +" minutes streamed"
+                            }} 
+                            else {return d}}))
+                    .style("font-family", "Roboto, sans-serif")
+                    .style("font-size","15px")
+                    .style("text-anchor", "start"); 
+
+            // x axis formatting
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .attr("class","axisGrey")
+                .call(d3.axisBottom(x)
+                    .tickFormat(d3.timeFormat("%b")) //set ticks to abbreviated year format
+                    .tickValues([xMin,x1,x2,x3,x4,xMax]))
+                    .style("font-family", "Roboto, sans-serif")
+                    .style("font-size","15px");
+
+            //add text box around ticks to prevent grid line overlap
+            d3.selectAll(".tick").each(function(d,i){
+            var tick = d3.select(this),
+                text = tick.select('text'),
+                bBox = text.node().getBBox();
+
+            tick.insert('rect', ':first-child')
+                .attr('x', bBox.x - 3)
+                .attr('y', bBox.y - 3)
+                .attr('height', bBox.height + 10)
+                .attr('width', bBox.width + 10)
+                .style('fill', '#FFFFFF');      
+            });
+
+            //set color of tick label text
+            d3.selectAll(".tick text")
+                .style("fill","black")
+
+            // This allows to find the closest X index of the mouse:
+            var bisect = d3.bisector(function(d) { 
+                return parseTime(d.date); }).left
+        
+            // Create the circle that travels along the curve of chart
+            var focus = svg.append('g')
+                .append('circle')
+                .style("fill", "#47e29a")
+                .attr("stroke", "#47e29a")
+                .attr('r', 4.5)
+                .style("opacity", 0)
+         
+
+            var Tooltip = d3.select("#my_dataviz")
+                .append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0)
+                .style("background-color", "white")
+                .style("box-shadow", "0px 1px 4px 0px #AAAAAA")
+                .style("border", "none")
+                .style("padding", "5px")
+                .attr("text-anchor", "left")
+                .attr("alignment-baseline", "middle")
+            
+            // Add the line
+            svg
+                .append("path")
+                .datum(data)
+                .attr("fill", "none")
+                .attr("stroke", '#47e29a')
+                .attr("stroke-width", 1.9)
+                .attr("d", d3.line()
+                .x(function(d) { 
+                    return x(parseTime(d.date)) })
+                .y(function(d) { 
+                    return y(d.minutes) })
+                )
+            
+            // Create a rect on top of the svg area: this rectangle recovers mouse position
+            svg
+                .append('rect')
+                .style("fill", "none")
+                .style("pointer-events", "all")
+                .attr('width', width-100)
+                .attr('height', height+100)
+                .on('mouseover', mouseover)
+                .on('mousemove', mousemove)
+                .on('mouseout', mouseout);
+            
+            
+            // What happens when the mouse move -> show the annotations at the right positions.
+            function mouseover() {
+                focus.style("opacity", 1)
+                Tooltip.style("opacity",1)
+            }
+            
+            function mousemove() {
+                // recover coordinate we need
+                var x0 = x.invert(d3.mouse(this)[0]);
+                var i = bisect(data, x0, 1); // this is returning length
+                selectedData = data[i]
+
+                focus
+                    .attr("cx", x(parseTime(selectedData.date)))
+                    .attr("cy", y(selectedData.minutes))
+                Tooltip
+                    .html("<b>Week of "+formatDate(parseTime(selectedData.date)) + "</b><br/> "+ decimalFormat(selectedData.minutes) +" minutes streamed")
+                    .style("left", ((d3.mouse(this)[0])) + "px")
+                    .style("top", (d3.mouse(this)[1])+ "px")
+                }
+            function mouseout() {
+                focus.style("opacity", 0)
+                Tooltip.style("opacity",0)
+
+            }}
+            // When the button is changed, run the updateChart function
+            d3.select("#selectButton").on("change", function(d) {
+                // recover the option that has been chosen
+                var selectedOption = d3.select(this).property("value")
+                // run the updateChart function with this selected option
+                artist = selectedOption
+                //clear chart here
+                createChart(artist)})
+
+        });
+    </script>
+
+                
